@@ -280,7 +280,7 @@ void update_bytes_read_display()
 	print_xy_ulong_as_decimal(main_program_state.col_bytes_read, 0, main_program_state.bytes_read, CX16_BG_BLUE | CX16_FG_WHITE, 8);	
 }
 
-void draw_main_screen_overlay()
+void draw_main_screen_overlay(char complete)
 {
 /*
 MODE 1 (80col) x60x30
@@ -303,17 +303,23 @@ AAAA BBBB  xx xx xx xx
 	unsigned char idx_value;
 	char str[128];
 	
-	ENABLE_SCREEN_MODE_1;
+	if (complete == TRUE)
+	{
+	  ENABLE_SCREEN_MODE_1;
+	}
 	  
 	textcolor(COLOR_WHITE);
 	bgcolor(COLOR_BLUE);
 	
 	//CLRSCR;  // will get cleared when videomode is set below	
 		
-	ENABLE_TEXT_MODE_2;  	
+	if (complete == TRUE)
+	{
+	  ENABLE_TEXT_MODE_2;  			
 	
-	main_program_state.curr_x = FIRST_COLUMN;
-	main_program_state.curr_y = 2;
+	  main_program_state.curr_x = FIRST_COLUMN;
+	  main_program_state.curr_y = 2;
+	}
 
 try_again:
 	switch (main_program_state.display_index)  
@@ -412,9 +418,12 @@ try_again:
 		cputcxy(main_program_state.divider3_offset, idx, '|');
 	}
 
-  reset_to_top();	  
+  if (complete == TRUE)
+	{
+    reset_to_top();	  
 	
-	main_program_state.curr_byte_idx = 0;
+	  main_program_state.curr_byte_idx = 0;
+	}
 	
 	force_full_refresh = TRUE;
 }
@@ -428,7 +437,7 @@ void show_help()
 	textcolor(COLOR_WHITE);
 	
 //        1234567890123456789012345678901234567890
-  printf("\nX16HXD V1.2 (BY VOIDSTAR)\n----------------------------\n");
+  printf("\nX16HXD V1.3 (BY VOIDSTAR)\n----------------------------\n");
 	printf("ARROW KEYS MOVE THE CURSOR\n");
 	printf("0-F   MODIFY CURRENT BYTE (HEX)\n");
 	printf("[ ]   MOVE ONE ROW UP/DOWN\n");
@@ -569,12 +578,12 @@ void main(void)
 		{
 			input_ch = fgetc(f);
 			
-			hex_data_buffer[idx] = input_ch;
-			
 			if (feof(f))
 			{
 				break;
 			}			
+
+			hex_data_buffer[idx] = input_ch;			
 			
 			++idx;
 			if (idx >= MAX_BUFFER_SIZE)
@@ -582,6 +591,7 @@ void main(void)
 				break;
 			}			
 		}
+		fclose(f);
 		main_program_state.bytes_read = idx;
 	}	
 			
@@ -589,7 +599,7 @@ void main(void)
 	main_program_state.original_text_bg = bgcolor(CX16_BG_BLUE);	
 	main_program_state.original_video_mode = videomode(VIDEOMODE_80x60);		
 			
-	draw_main_screen_overlay();	
+	draw_main_screen_overlay(TRUE);	
 		
 	goto update_hex_display;
 	
@@ -640,7 +650,7 @@ advance_cursor:
 		  case 'v':
 			  {					
 					++main_program_state.display_index;
-					draw_main_screen_overlay();          
+					draw_main_screen_overlay(TRUE);
 				}
 				break;
 				
@@ -711,8 +721,8 @@ advance_cursor:
 					{
 						++edit_index;
 						edit_str[1] = ch;
-						ch = 29;
-						goto advance_cursor;
+						ch = 29;  // RIGHT_ARROW
+						goto advance_cursor;  // run the case again to process the RIGHT_ARROW movement
 					}										
 			  }
 			  break;
@@ -720,7 +730,7 @@ advance_cursor:
 			case 'h':  // H help
 			  {
 					show_help();
-          draw_main_screen_overlay();	
+          draw_main_screen_overlay(FALSE);	
 		     	goto update_hex_display;					
 					break;  // not really necessary
 			  }
@@ -823,7 +833,9 @@ advance_cursor:
 			  {
   				if (edit_index > 0)
 					{
-						// do nothing
+						// cancel the edit
+						edit_index = 0;
+						force_full_refresh = TRUE;
 					}
 					else
 					{
@@ -1041,7 +1053,7 @@ LEFT_BRACKET:
 					}
 					else 
 					{
-            draw_main_screen_overlay();          					
+            draw_main_screen_overlay(TRUE);
 					}
 			  }
 			  break;
@@ -1113,6 +1125,7 @@ LEFT_BRACKET:
   			break;				
 			}
 			
+update_hex_display:
 			if (main_program_state.buffer_modified == TRUE)
 			{
 				//sprintf(str, "FILE: %s", main_program_state.input_filename);
@@ -1124,7 +1137,6 @@ LEFT_BRACKET:
 				cputsxy(0, main_program_state.curr_height, "   ");
 			}			
 		
-update_hex_display:
       // Draw current byte index at bottom of screen
       print_xy_ulong_as_decimal(main_program_state.col_bytes_read, main_program_state.curr_height, main_program_state.offset_min + main_program_state.curr_byte_idx, CX16_BG_BLUE | CX16_FG_LT_RED, 8);
 
